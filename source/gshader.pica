@@ -1,0 +1,287 @@
+; REMEMBER: X and Y are swapped
+
+; Constants
+.constf myconst(128.0, 0.0019455, 0.0, 1.0) ;i THINK 128 is right...  and y is 1/512...also maybe right...
+.constf ugh(2.0, 3.0, 4.0, 5.0) ;this is really messy...
+.alias zeros myconst.zzzz
+.alias ones myconst.wwww
+
+.setb b0, true
+.seti i0(2, 0, 2, 2)
+
+; Outputs - this time the type *is* used
+.out outpos position
+.out outclr color
+
+; Inputs: we will receive the following inputs:
+; v0-v2: position/color of the first vertex
+; v3-v5: position/color of the second vertex
+; v6-v8: position/color of the third vertex
+
+.proc main ;this should work even when w<0? right?
+        mov r0.yz, zeros
+
+	mov r1, v0
+        mov r5.z, v1.x
+        mov r2, v2
+        mov r3, v3
+        mov r5.w, v4.x
+        mov r4, v5
+        call split
+        cmp zeros, eq, eq, r0.ww
+        jmpc cmp.x, n
+        mov r3, v3
+        mov r5.w, v4.x
+        mov r4, v5
+        call add
+n:
+	mov r1, v3
+        mov r5.z, v4.x
+        mov r2, v5
+        mov r3, v6
+        mov r5.w, v7.x
+        mov r4, v8
+        call split
+        cmp zeros, eq, eq, r0.ww
+        jmpc cmp.x, o
+        mov r3, v6
+        mov r5.w, v7.x
+        mov r4, v8
+        call add
+o:
+	mov r1, v6
+        mov r5.z, v7.x
+        mov r2, v8
+        mov r3, v0
+        mov r5.w, v1.x
+        mov r4, v2
+        call split
+        cmp zeros, eq, eq, r0.ww
+        jmpc cmp.x, p
+        mov r3, v0
+        mov r5.w, v1.x
+        mov r4, v2
+        call add
+p:
+        ;maybe should reuse split function?
+
+        cmp zeros, eq, eq, r0.y
+        jmpc cmp.x, zero
+        add r0.y, -ones, r0.y
+        mov r1, r8
+        mov r2, r9
+        mov r3, r10
+        mov r4, r11
+        mov r5.zw, r6.xy
+        call split2
+        cmp zeros, eq, eq, r0.ww
+        jmpc cmp.x, q
+        mov r3, r10
+        mov r4, r11
+        mov r5.w, r6.y
+        call add2
+q:
+        add r0.y, -ones, r0.y
+        mov r1, r10
+        mov r2, r11
+        mov r3, r12
+        mov r4, r13
+        mov r5.zw, r6.yz
+        call split2
+        cmp zeros, eq, eq, r0.ww
+        jmpc cmp.x, r
+        mov r3, r12
+        mov r4, r13
+        mov r5.w, r6.z
+        call add2
+r:
+
+        mov r1, r12
+        mov r2, r13
+        mov r5.z, r6.z
+        cmp ones, eq, eq, r0.y
+        jmpc cmp.x, three
+        mov r3, r14
+        mov r4, r15
+        mov r5.w, r6.w
+        call split2
+        cmp zeros, eq, eq, r0.ww
+        jmpc cmp.x, s
+        mov r3, r14
+        mov r4, r15
+        mov r5.w, r6.w
+        call add2
+s:
+
+        mov r1, r14
+        mov r2, r15
+        mov r5.z, r6.w
+three:
+        mov r3, r8
+        mov r4, r9
+        mov r5.w, r6.x
+        call split2
+        cmp zeros, eq, eq, r0.ww
+        jmpc cmp.x, t
+        mov r3, r8
+        mov r4, r9
+        mov r5.w, r6.x
+        call add2
+t:
+zero:
+        nop ;b/c why not?
+        ;we're done! yay!
+
+	end
+.end
+
+.proc split2 ;if r0.w (or something) is changed, call add2 again
+        mov r0.w, zeros
+        rcp r0.x, myconst.y
+        mad r5.x, r0.x, r1.z, r1.w
+        mad r5.y, r0.x, r3.z, r3.w
+        cmp zeros, gt, gt, r5.xy ;r5.xy<0
+        jmpc cmp.x || cmp.y, k ;if either is behind
+        mov r0.w, zeros
+        call add2
+        jmpu b0, split2_end
+k:
+        cmp zeros, gt, gt, r5.xy ;probably unnecessary
+        jmpc cmp.x, l ;if first is behind
+        call intersect2
+        mov r0.w, zeros
+        jmpu b0, split2_end
+l:
+        cmp zeros, gt, gt, r5.xy
+        jmpc cmp.y, m ;if second (and first) are behind
+        call intersect2
+        mov r0.w, ones
+m:
+split2_end:
+        nop ;i seem to need this here. no idea why
+.end
+
+.proc split 
+        mov r0.w, zeros
+        mov r5.x, r1.z
+        mov r5.y, r3.z
+        cmp zeros, lt, lt, r5.xy
+        jmpc cmp.x || cmp.y, h ;if either is behind
+        call add
+        jmpu b0, split_end
+h:
+        cmp zeros, lt, lt, r5.xy ;probably unnecessary
+        jmpc cmp.x, i ;if first is behind
+        call intersect
+        mov r0.w, zeros
+        jmpu b0, split_end
+i:
+        cmp zeros, lt, lt, r5.xy
+        jmpc cmp.y, j ;if second (and first) are behind
+        call intersect
+        mov r0.w, ones
+j:
+split_end:
+        nop ;i seem to need this here. no idea why
+.end
+
+.proc intersect ;in: r1-r4. out:r3-r4
+        add r7.x, -r3.z, r1.z
+        rcp r7.y, r7.x
+        mul r0.w, r1.z, r7.y
+        call intersect3
+        call add
+        nop
+.end
+
+.proc intersect2 ;in: r1-r4. out:r3-r4
+        mul r7.y, r0.x, r1.z
+        add r7.x, r7.y, r1.w
+        mul r7.y, r0.x, r3.z
+        add r7.z, r7.x, -r7.y
+        add r7.w, r7.z, -r3.w
+        rcp r7.y, r7.w
+        mul r0.w, r7.x, r7.y
+        call intersect3
+        call add2
+        nop
+.end
+
+.proc intersect3
+        add r0.x, ones, -r0.w
+        mul r7.x, r0.x, r5.z
+        mul r7.y, r0.w, r5.w
+        add r5.w, r7.x, r7.y
+        mul r7, r0.w, r3
+        mul r3, r0.x, r1
+        add r3, r7, r3
+        mul r7, r0.w, r4
+        mul r4, r0.x, r2
+        add r4, r7, r4
+.end
+
+.proc add2 ;r3: pos, r4: color
+        add r0.z, ones, r0.z
+        cmp ones, eq, eq, r0.z
+        jmpc !cmp.x, a
+        setemit 0
+        jmpu b0, add2_end
+a:
+        cmp ugh.x, eq, eq, r0.z
+        jmpc !cmp.x, b
+        setemit 1
+        jmpu b0, add2_end
+b:
+        cmp ugh.y, eq, eq, r0.z
+        jmpc !cmp.x, c
+        setemit 2, prim
+        jmpu b0, add2_end
+c:
+        cmp ugh.z, eq, eq, r0.z
+        jmpc !cmp.x, d
+        setemit 1, inv prim
+        jmpu b0, add2_end
+d:
+        setemit 2, prim
+add2_end:
+        add r7.y, myconst.x, r5.w
+        add r7.x, -myconst.x, r7.y
+        rcp r7.z, r3.w
+        mul r7.w, r3.z, r7.z
+        add r7.y, r7.x, r7.w
+        mul outpos.z, r3.w, r7.y ;right?
+
+        mov outpos.xyw, r3.xyw
+        mov outclr, r4
+	emit
+.end
+
+.proc add ;r3: pos, r4: color
+        add r0.y, ones, r0.y
+        cmp ones, eq, eq, r0.y
+        jmpc !cmp.x, e
+        mov r8, r3
+        mov r9, r4
+        mov r6.x, r5.w
+        jmpu b0, add_end
+e:
+        cmp ugh.x, eq, eq, r0.y
+        jmpc !cmp.x, f
+        mov r10, r3
+        mov r11, r4
+        mov r6.y, r5.w
+        jmpu b0, add_end
+f:
+        cmp ugh.y, eq, eq, r0.y
+        jmpc !cmp.x, g
+        mov r12, r3
+        mov r13, r4
+        mov r6.z, r5.w
+        jmpu b0, add_end
+g:
+        mov r14, r3
+        mov r15, r4
+        mov r6.w, r5.w
+add_end:
+        nop ;necessary
+.end

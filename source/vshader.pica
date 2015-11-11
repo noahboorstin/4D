@@ -1,0 +1,76 @@
+; Example PICA200 vertex shader
+
+; Constants
+.constf myconst(0.0, 1.0, 0.000001, 0.5)
+.alias  zeros myconst.xxxx ; Vector full of zeros
+.alias  ones  myconst.yyyy ; Vector full of ones
+
+; Uniforms
+.fvec proj1[4], proj2[4], view1[4], view2[4]
+.fvec proj1e, view1e
+
+; Outputs - since we are also using a geoshader the output type isn't really used
+.out outpos position
+.out other position
+.out outclr color
+
+; Inputs (defined as aliases for convenience)
+.alias inpos v0
+.alias inclr v1
+
+.proc main
+
+        dp4 r0.x, view1[0], v0
+	dp4 r0.y, view1[1], v0
+	dp4 r0.z, view1[2], v0
+	dp4 r0.w, view1[3], v0
+        add r1, view1e, r0
+
+        dp4 r0.x, proj1[0], r1
+	dp4 r0.y, proj1[1], r1
+	dp4 r0.z, proj1[2], r1
+	dp4 r0.w, proj1[3], r1
+        add r0.w, proj1e.w, r0.w
+        mul r1.x, proj1e.x, r1.w
+
+        cmp zeros, eq, eq, r1.x
+        jmpc !cmp.x, good
+        add r2.w, myconst.z, r1.x
+        mov r1.x, r2.w
+good:   ;avoid dividing by zero. its good enough. shut up. 
+        mov r3.x, r1.x
+        rcp r2.x, r1.x
+        mul r1, r2.xxxx, r0
+
+        mov other.x, r1.w
+        mov other.yzw, zeros
+        mov r1.w, ones
+
+        dp4 r0.x, view2[0], r1
+	dp4 r0.y, view2[1], r1
+	dp4 r0.z, view2[2], r1
+	dp4 r0.w, view2[3], r1
+
+	dp4 r1.x, proj2[0], r0
+	dp4 r1.y, proj2[1], r0
+	dp4 r1.z, proj2[2], r0
+	dp4 r1.w, proj2[3], r0
+        
+        mov r4, inclr
+
+        ;mov r3.y, r1.w ;WHY IS THIS NOT NEEDED!??!?!?
+        ;cmp zeros, le, le, r3.xy ;woah...it's already been flipped for me... i think...
+        ;jmpc cmp.x || cmp.y, good2
+        ;mov r3.z, zeros
+        ;add r3.w, -ones, r3.z
+        ;mul r3.z, r3.w, r3.x
+        ;mov r3.x, r3.z
+        ;mov r4, ones
+good2:
+        mul outpos, r1, r3.xxxx
+	mov outclr.xyzw,     r4.xyzw
+        ;mov outclr.w, myconst.y
+
+	; We're finished
+	end
+.end
